@@ -5,15 +5,21 @@ const roomIdToUsers = {};  // track users per community
 
 function setupSocket(io) {
 
-    const broadcastUserList = () => {
-        const nicknames = Object.values(users);
-        io.emit('users-list', { nicknames, count: nicknames.length });
+    const broadcastGlobalUserList = () => {
+        const globalSockets = Array.from(io.sockets.sockets.values()).filter(s => {
+            const rooms = Array.from(s.rooms);
+            return !rooms.some(r => r !== s.id); // not in any room
+        });
+
+        const nicknames = globalSockets.map(s => users[s.id]).filter(Boolean);
+        globalSockets.forEach(s => {
+            s.emit('users-list', { nicknames, count: nicknames.length });
+        });
     };
 
     io.on('connection', (socket) => {
         console.log("A user Connected:", socket.id);
 
-        // Global Chat Logic
         socket.on('check-nickname', nickname => {
             nickname = nickname?.trim();
 
@@ -27,44 +33,57 @@ function setupSocket(io) {
             activeNicknames.add(nickname);
 
             socket.emit('nickname-status', { success: true, nickname });
-            socket.broadcast.emit('message', {
-                nickname: "Server",
-                message: `${nickname} joined the chat`,
-                time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+
+            // Only emit join message to users NOT in any room
+            const globalSockets = Array.from(io.sockets.sockets.values()).filter(s => {
+                const rooms = Array.from(s.rooms);
+                return !rooms.some(r => r !== s.id);
             });
 
-            broadcastUserList();
-        });
-
-        // message - Handle chat messages for global chat only (no room joined)
-        socket.on('user-message', message => {
-            const nickname = users[socket.id] || 'Anonymous';
-            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            // io.emit('message', { nickname, message, time }); **to all
-
-            // Only emit to users not in any community room
-            const rooms = Array.from(socket.rooms);
-            const isInRoom = rooms.some(r => r !== socket.id); // if socket is in any custom room
-
-            if (!isInRoom) {
-                io.to(socket.id).emit('message', { nickname, message, time }); // send to sender
-                socket.broadcast.emit('message', { nickname, message, time }); // send to others not in room
-            }
-        });
-
-        // Global file upload
-        socket.on('file-upload', ({ fileType, fileName, fileData, time }) => {
-            const nickname = users[socket.id] || 'Anonymous';
-            io.emit('file-message', {
-                nickname,
-                fileType,
-                fileName,
-                fileData,
-                time
+            globalSockets.forEach(s => {
+                if (s.id !== socket.id) {
+                    s.emit('message', {
+                        nickname: "Server",
+                        message: `${nickname} joined the chat`,
+                        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                    });
+                }
             });
+
+            broadcastGlobalUserList();
         });
 
-        // Community (Room) Chat Logic 
+// Global chat message
+socket.on('user-message', message => {
+    const nickname = users[socket.id] || 'Anonymous';
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Only emit to users NOT in any community room
+    const globalSockets = Array.from(io.sockets.sockets.values()).filter(s => {
+        const rooms = Array.from(s.rooms);
+        return !rooms.some(r => r !== s.id);
+    });
+
+    globalSockets.forEach(s => {
+        s.emit('message', { nickname, message, time });
+    });
+});
+
+// Global chat file/image
+socket.on('file-upload', ({ fileType, fileName, fileData, time }) => {
+    const nickname = users[socket.id] || 'Anonymous';
+
+    const globalSockets = Array.from(io.sockets.sockets.values()).filter(s => {
+        const rooms = Array.from(s.rooms);
+        return !rooms.some(r => r !== s.id);
+    });
+
+    globalSockets.forEach(s => {
+        s.emit('file-message', {
+            nickname, fileType, fileName, fileData, time
+        });
+    });
+});
 
         socket.on("join-room", ({ roomId, user }) => {
             socket.join(roomId);
@@ -81,14 +100,12 @@ function setupSocket(io) {
                 time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
             });
 
-            // Send room user list
             io.to(roomId).emit("users-list", {
                 nicknames: Array.from(roomIdToUsers[roomId]),
                 count: roomIdToUsers[roomId].size
             });
         });
 
-        // Room message
         socket.on("room-message", ({ message }) => {
             const { roomId, user } = socket.data;
             if (!roomId || !user) return;
@@ -99,7 +116,6 @@ function setupSocket(io) {
             });
         });
 
-        // Room file upload
         socket.on("room-file-upload", ({ fileType, fileName, fileData }) => {
             const { roomId, user } = socket.data;
             if (!roomId || !user) return;
@@ -112,28 +128,37 @@ function setupSocket(io) {
             });
         });
 
-        //Disconnect 
         socket.on("disconnect", () => {
             const nickname = users[socket.id];
             const roomId = socketToRoom[socket.id];
             const user = socket.data?.user;
 
-            // Leave global
+            // Global disconnect
             if (nickname) {
                 delete users[socket.id];
                 activeNicknames.delete(nickname);
-                socket.broadcast.emit("message", {
-                    nickname: "Server",
-                    message: `${nickname} left the chat`,
-                    time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+
+                const globalSockets = Array.from(io.sockets.sockets.values()).filter(s => {
+                    const rooms = Array.from(s.rooms);
+                    return !rooms.some(r => r !== s.id);
                 });
-                broadcastUserList();
+
+                globalSockets.forEach(s => {
+                    s.emit("message", {
+                        nickname: "Server",
+                        message: `${nickname} left the chat`,
+                        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                    });
+                });
+
+                broadcastGlobalUserList();
             }
 
-            // Leave room
+            // Community disconnect
             if (roomId && user) {
                 socket.leave(roomId);
                 roomIdToUsers[roomId]?.delete(user.name);
+
                 io.to(roomId).emit("message", {
                     nickname: "Server",
                     message: `${user.name} left the room`,
