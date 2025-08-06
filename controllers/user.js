@@ -19,14 +19,14 @@ async function handleUserLogin(req,res){
     const {email,password} = req.body;
     const user = await User.findOne({email});
     if(!user){
-        return res.redirect("/login");
+        return res.redirect("login");
         // return res.render('login',{
         //     error : "Invalid Username Or Password"
         // });
     }
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-        return res.redirect("/login");
+        return res.redirect("login");
         
     }
 

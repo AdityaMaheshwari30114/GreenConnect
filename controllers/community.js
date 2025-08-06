@@ -41,7 +41,7 @@ async function handleJoinCommunity(req, res) {
 // List All Communities (for join page)
 async function handleListCommunities(req, res) {
     const communities = await Community.find({});
-    return res.render("join-community", { user: req.user, communities });
+    return res.render("community/join-community", { user: req.user, communities });
 }
 
 // List My Communities (optional for dashboard)
@@ -49,7 +49,7 @@ async function handleMyCommunities(req, res) {
     const myCommunities = await Community.find({
         members: req.user._id,
     });
-    return res.render("my-communities", { user: req.user, myCommunities });
+    return res.render("community/my-communities", { user: req.user, myCommunities });
 }
 
 module.exports = {

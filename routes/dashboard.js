@@ -5,7 +5,7 @@ const router = express.Router();
 const {restrictToLoggedInUsersOnly} = require("../middlewares/auth");
 
 router.get("/", restrictToLoggedInUsersOnly,(req,res)=>{
-    return res.sendFile(path.join(__dirname,"../views/dashboard.html"));
+    return res.sendFile(path.join(__dirname,"../views/dashboard/dashboard.html"));
 });
 
 module.exports = router;

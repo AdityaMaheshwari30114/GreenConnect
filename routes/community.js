@@ -13,7 +13,7 @@ const { restrictToLoggedInUsersOnly } = require("../middlewares/auth");
 
 // Show form to create a new community (optional view)
 router.get("/create", restrictToLoggedInUsersOnly, (req, res) => {
-    res.render("create-community", { user: req.user });
+    res.render("community/create-community", { user: req.user });
 });
 
 // Handle community creation
@@ -36,7 +36,7 @@ router.get("/:id/chat", restrictToLoggedInUsersOnly, async (req, res) => {
         return res.status(404).send("Community not found");
     }
 
-    return res.render("community-chat", {
+    return res.render("community/community-chat", {
         user: req.user,
         community
     });

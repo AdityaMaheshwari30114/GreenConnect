@@ -37,12 +37,12 @@ app.use('/user', userRoutes);
 
 app.get('/login', checkAuth, (req, res) => {
     if (req.user) return res.redirect('/');
-    res.sendFile(path.join(__dirname, "views/login.html"));
+    res.sendFile(path.join(__dirname, "views/auth/login.html"));
 });
 
 app.get('/signup', checkAuth, (req, res) => {
     if (req.user) return res.redirect('/');
-    res.sendFile(path.join(__dirname, "views/signup.html"));
+    res.sendFile(path.join(__dirname, "views/auth/signup.html"));
 });
 
 //  Protect main chat page
