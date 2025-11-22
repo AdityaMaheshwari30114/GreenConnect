@@ -1,4 +1,4 @@
-# GreenConnect 🌱– Community-Driven Chat for Environmental Enthusiasts
+# GreenConnect 🌱– Connecting People for a Greener Future
 
 ## 📝 Description  
 GreenConnect is a real-time online chat application designed to bring together individuals and communities who care about the environment.
